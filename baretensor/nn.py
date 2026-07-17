@@ -3,6 +3,18 @@ from .tensor import Tensor
 
 class Module:
     """Base class for all neural network modules."""
+    def __init__(self):
+        self.training = True
+
+    def train(self, mode=True):
+        self.training = mode
+        for value in vars(self).values():
+            if isinstance(value, Module):
+                value.train(mode)
+
+    def eval(self):
+        self.train(False)
+
 
     def parameters(self):
         """Return list of learnable parameters. Override in subclasses."""
@@ -55,6 +67,7 @@ class Linear(Module):
     """Fully connected linear layer: y = x @ W + b."""
 
     def __init__(self, in_features, out_features):
+        super().__init__()
         self.weight = Tensor(
             np.random.randn(in_features, out_features) * np.sqrt(2.0 / in_features),
             requires_grad=True,
@@ -66,6 +79,106 @@ class Linear(Module):
 
     def parameters(self):
         return [self.weight, self.bias]
+
+class Dropout(Module):
+    """Inverted dropout regularization layer.
+
+    During training: randomly zeroes elements with probability p and scales
+    the remaining by 1/(1-p). During eval: acts as identity.
+    """
+
+    def __init__(self, p=0.5):
+        super().__init__()
+        self.p = p
+        self.mask = None
+
+    def __call__(self, x):
+        if not self.training:
+            return x
+        scale = 1.0 / (1.0 - self.p)
+        self.mask = (np.random.rand(*x.data.shape) > self.p).astype(np.float32) * scale
+        out_data = x.data * self.mask
+        out = Tensor(out_data, parents=(x,), requires_grad=True)
+
+        def _backward():
+            x.grad += out.grad * self.mask
+
+        out._backward = _backward
+        return out
+
+
+class BatchNorm1d(Module):
+    """Batch Normalization for 2D inputs (batch, features).
+
+    Normalizes each feature to have zero mean and unit variance across the batch,
+    then applies learnable affine transform (gamma * x_hat + beta).
+
+    During training: uses batch statistics.
+    During eval: uses running mean/variance.
+    """
+
+    def __init__(self, num_features, eps=1e-5, momentum=0.9):
+        super().__init__()
+        self.num_features = num_features
+        self.eps = eps
+        self.momentum = momentum
+
+        # Learnable parameters
+        self.gamma = Tensor(np.ones(num_features), requires_grad=True)
+        self.beta = Tensor(np.zeros(num_features), requires_grad=True)
+
+        # Running statistics (not learnable, no grad)
+        self.running_mean = np.zeros(num_features, dtype=np.float32)
+        self.running_var = np.ones(num_features, dtype=np.float32)
+
+    def parameters(self):
+        return [self.gamma, self.beta]
+
+    def __call__(self, x):
+        if self.training:
+            # Compute batch statistics
+            batch_mean = np.mean(x.data, axis=0)  # shape: (num_features,)
+            batch_var = np.var(x.data, axis=0)    # shape: (num_features,)
+
+            # Update running statistics
+            self.running_mean = self.momentum * self.running_mean + (1 - self.momentum) * batch_mean
+            self.running_var = self.momentum * self.running_var + (1 - self.momentum) * batch_var
+
+            # Normalize using batch stats
+            mu = batch_mean
+            var = batch_var
+        else:
+            mu = self.running_mean
+            var = self.running_var
+
+        N = x.data.shape[0]  # batch size
+        std = np.sqrt(var + self.eps)
+        x_hat = (x.data - mu) / std
+        out_data = self.gamma.data * x_hat + self.beta.data
+        out = Tensor(out_data, parents=(x, self.gamma, self.beta), requires_grad=True)
+
+        def _backward():
+            dy = out.grad  # shape: (N, C)
+
+            if self.gamma.requires_grad:
+                self.gamma.grad += np.sum(dy * x_hat, axis=0)
+            if self.beta.requires_grad:
+                self.beta.grad += np.sum(dy, axis=0)
+            if x.requires_grad:
+                # Gradient through batch normalization
+                # Reference: https://arxiv.org/abs/1502.03167
+                N = x.data.shape[0]
+                dx_hat = dy * self.gamma.data
+                # Sum over batch for the mean of dx_hat and dx_hat * x_hat
+                sum_dx_hat = np.sum(dx_hat, axis=0)
+                sum_dx_hat_x_hat = np.sum(dx_hat * x_hat, axis=0)
+                dx = (1.0 / N) * (1.0 / std) * (
+                    N * dx_hat - sum_dx_hat - x_hat * sum_dx_hat_x_hat
+                )
+                x.grad += dx
+
+        out._backward = _backward
+        return out
 
 def cat(tensors, axis=-1):
     """Concatenates a list of Tensors along a specified axis."""
@@ -165,6 +278,7 @@ def cross_entropy_loss(logits, targets):
 
 class MultiHeadAttention(Module):
     def __init__(self, d_model, num_heads):
+        super().__init__()
         self.num_heads = num_heads
         self.d_k = d_model // num_heads
         assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
@@ -192,6 +306,7 @@ class MultiHeadAttention(Module):
 
 class TransformerEncoderBlock(Module):
     def __init__(self, d_model, num_heads, d_ff):
+        super().__init__()
         self.mha = MultiHeadAttention(d_model, num_heads)
         self.gamma1 = Tensor(np.ones(d_model), requires_grad=True)
         self.beta1 = Tensor(np.zeros(d_model), requires_grad=True)
@@ -218,6 +333,7 @@ class TransformerEncoderBlock(Module):
 class Embedding(Module):
     """Embedding layer for mapping token IDs to dense vectors."""
     def __init__(self, vocab_size, embedding_dim):
+        super().__init__()
         self.weight = Tensor(np.random.randn(vocab_size, embedding_dim) * 0.02, requires_grad=True)
 
     def __call__(self, indices):

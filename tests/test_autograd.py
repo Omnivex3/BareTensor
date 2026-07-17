@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import numpy as np
 import pytest
 from baretensor.tensor import Tensor
@@ -431,4 +432,87 @@ def test_layer_norm_3d_autograd():
 
 
 
+
+def test_dropout_parity():
+    np.random.seed(42)
+    torch.manual_seed(42)
+
+    from baretensor.nn import Dropout
+
+    N, D = 10, 5
+    x_np = np.random.randn(N, D).astype(np.float32)
+
+    # --- Eval mode: identity ---
+    bt_drop = Dropout(p=0.5)
+    bt_drop.eval()
+    bt_x = Tensor(x_np.copy())
+    bt_out = bt_drop(bt_x)
+    assert np.allclose(bt_out.data, bt_x.data), "Eval mode should be identity"
+
+    # --- Train mode: structure check ---
+    bt_drop2 = Dropout(p=0.5)
+    bt_drop2.train()
+    bt_x2 = Tensor(x_np.copy(), requires_grad=True)
+    bt_out2 = bt_drop2(bt_x2)
+    # Expected fraction of zeros ~ p
+    zero_frac = np.mean(bt_out2.data == 0)
+    assert 0.3 < zero_frac < 0.7, f"Expected ~50% zeros, got {zero_frac:.3f}"
+    # Scaled mean should roughly match input mean
+    nonzero = bt_out2.data[bt_out2.data != 0]
+    if len(nonzero) > 0:
+        expected_scale = 1.0 / (1.0 - 0.5)
+        assert np.abs(np.mean(nonzero) - np.mean(x_np) * expected_scale) < 2.0, \
+            "Scaled nonzero mean should approximately match input * scale"
+
+    # --- Gradient flow through surviving neurons ---
+    loss = bt_out2.sum()
+    loss.backward()
+    assert bt_x2.grad is not None, "x should have a gradient"
+    # Gradients should be zero where mask was zero
+    assert bt_drop2.mask is not None
+    zero_grad_mask = (bt_drop2.mask == 0)
+    assert np.all(bt_x2.grad[zero_grad_mask] == 0), \
+        "Gradients should be zero for dropped neurons"
+    print("Dropout parity: OK")
+
+
+def test_batchnorm1d_parity():
+    np.random.seed(42)
+    torch.manual_seed(42)
+
+    from baretensor.nn import BatchNorm1d
+
+    N, C = 4, 3
+    x_np = np.random.randn(N, C).astype(np.float32)
+
+    # PyTorch reference
+    pt_bn = nn.BatchNorm1d(C, eps=1e-5, momentum=0.9, affine=True)
+    pt_bn.train()
+    pt_x = torch.tensor(x_np.copy(), requires_grad=True)
+    pt_out = pt_bn(pt_x)
+    pt_loss = pt_out.sum()
+    pt_loss.backward()
+
+    # BareTensor
+    bt_bn = BatchNorm1d(C, eps=1e-5, momentum=0.9)
+    bt_bn.train()
+    bt_x = Tensor(x_np.copy(), requires_grad=True)
+    bt_out = bt_bn(bt_x)
+    loss = bt_out.sum()
+    loss.backward()
+
+    # Compare outputs
+    np.testing.assert_allclose(bt_out.data, pt_out.detach().numpy(), atol=1e-5,
+                               err_msg="BatchNorm1d forward mismatch")
+
+    # Compare gamma/beta gradients
+    np.testing.assert_allclose(bt_bn.gamma.grad, pt_bn.weight.grad.numpy(), atol=1e-5,
+                               err_msg="BatchNorm1d gamma grad mismatch")
+    np.testing.assert_allclose(bt_bn.beta.grad, pt_bn.bias.grad.numpy(), atol=1e-5,
+                               err_msg="BatchNorm1d beta grad mismatch")
+
+    # Compare input gradients
+    np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=1e-5,
+                               err_msg="BatchNorm1d dx mismatch")
+    print("BatchNorm1d parity: OK")
 

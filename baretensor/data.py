@@ -33,11 +33,18 @@ class TensorDataset(Dataset):
         if not tensors:
             raise ValueError("TensorDataset requires at least one tensor")
 
-        # Convert any baretensor Tensors to numpy arrays
-        converted = [
-            t.data if isinstance(t, Tensor) else np.asarray(t, dtype=np.float32)
-            for t in tensors
-        ]
+        # Convert any baretensor Tensors to numpy arrays;
+        # preserve integer dtypes (labels) rather than forcing float32.
+        converted = []
+        for t in tensors:
+            if isinstance(t, Tensor):
+                converted.append(t.data)
+            else:
+                arr = np.asarray(t)
+                if arr.dtype.kind in ('i', 'u', 'b'):
+                    converted.append(arr)
+                else:
+                    converted.append(arr.astype(np.float32))
 
         length = converted[0].shape[0]
         for t in converted:

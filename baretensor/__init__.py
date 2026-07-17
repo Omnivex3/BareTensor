@@ -2,6 +2,8 @@ from .tensor import Tensor
 from .nn import (
     Module,
     Linear,
+    Dropout,
+    BatchNorm1d,
     MultiHeadAttention,
     TransformerEncoderBlock,
     scaled_dot_product_attention,
@@ -17,6 +19,8 @@ __all__ = [
     "Tensor",
     "Module",
     "Linear",
+    "Dropout",
+    "BatchNorm1d",
     "MultiHeadAttention",
     "TransformerEncoderBlock",
     "scaled_dot_product_attention",
