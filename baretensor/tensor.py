@@ -73,9 +73,11 @@ class Tensor:
 
         def _backward():
             if self.requires_grad:
-                self.grad += out.grad @ other.data.T
+                other_t = other.data.swapaxes(-1, -2)
+                self.grad += self._unbroadcast(out.grad @ other_t, self.data.shape)
             if other.requires_grad:
-                other.grad += self.data.T @ out.grad
+                self_t = self.data.swapaxes(-1, -2)
+                other.grad += self._unbroadcast(self_t @ out.grad, other.data.shape)
 
         out._backward = _backward
         return out
@@ -94,12 +96,23 @@ class Tensor:
         out._backward = _backward
         return out
 
-    def transpose(self):
-        out = Tensor(self.data.T, parents=(self,), requires_grad=True)
+    def transpose(self, axes=None):
+        if axes is not None:
+            ndim = self.data.ndim
+            axes = tuple(ax if ax >= 0 else ndim + ax for ax in axes)
+            out_data = self.data.transpose(axes)
+        else:
+            out_data = self.data.T
+
+        out = Tensor(out_data, parents=(self,), requires_grad=True)
 
         def _backward():
             if self.requires_grad:
-                self.grad += out.grad.T
+                if axes is not None:
+                    inv_axes = np.argsort(axes)
+                    self.grad += out.grad.transpose(inv_axes)
+                else:
+                    self.grad += out.grad.T
 
         out._backward = _backward
         return out
@@ -114,6 +127,26 @@ class Tensor:
             if self.requires_grad:
                 sum_gy = np.sum(out.grad * probs, axis=axis, keepdims=True)
                 self.grad += probs * (out.grad - sum_gy)
+
+        out._backward = _backward
+        return out
+
+    def embedding(self, indices):
+        out = Tensor(self.data[indices], parents=(self,), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                np.add.at(self.grad, indices, out.grad)
+
+        out._backward = _backward
+        return out
+
+    def reshape(self, shape):
+        out = Tensor(self.data.reshape(shape), parents=(self,), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                self.grad += out.grad.reshape(self.data.shape)
 
         out._backward = _backward
         return out

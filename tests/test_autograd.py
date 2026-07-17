@@ -308,3 +308,127 @@ def test_causal_mask_parity():
     np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=1e-3, rtol=1e-3,
                                err_msg="Masked Input X Gradient Mismatch")
 
+def test_embedding_parity():
+    """Verify Embedding lookup forward and backward (scatter-add) against PyTorch.
+    Specifically checks gradient accumulation when index duplicates exist in a batch."""
+    np.random.seed(42)
+    vocab_size = 50
+    embedding_dim = 16
+    batch_size = 4
+    seq_length = 8
+
+    # Generate indices with duplicates
+    indices = np.random.randint(0, vocab_size, size=(batch_size, seq_length))
+
+    # Weight matrix
+    w_data = np.random.randn(vocab_size, embedding_dim).astype(np.float32)
+
+    # 1. PyTorch
+    pt_w = torch.tensor(w_data, requires_grad=True)
+    pt_out = pt_w[indices]
+    pt_loss = pt_out.sum()
+    pt_loss.backward()
+
+    # 2. BareTensor
+    bt_w = Tensor(w_data, requires_grad=True)
+    bt_out = bt_w.embedding(indices)
+    bt_loss = bt_out.sum()
+    bt_loss.backward()
+
+    # 3. Interrogation
+    np.testing.assert_allclose(bt_out.data, pt_out.detach().numpy(), atol=1e-5,
+                               err_msg="Embedding Forward Mismatch")
+    np.testing.assert_allclose(bt_w.grad, pt_w.grad.numpy(), atol=1e-5,
+                               err_msg="Embedding Gradient Mismatch")
+
+def test_batched_matmul_parity():
+    """Verify batched 3D @ 2D matrix multiplication forward and backward passes.
+    This ensures that batched linear layers and batched MHA compute correct gradients."""
+    np.random.seed(42)
+    B, M, N, P = 3, 5, 8, 4
+    x_data = np.random.randn(B, M, N).astype(np.float32)
+    w_data = np.random.randn(N, P).astype(np.float32)
+
+    # 1. PyTorch
+    pt_x = torch.tensor(x_data, requires_grad=True)
+    pt_w = torch.tensor(w_data, requires_grad=True)
+    pt_out = pt_x @ pt_w
+    pt_loss = pt_out.sum()
+    pt_loss.backward()
+
+    # 2. BareTensor
+    bt_x = Tensor(x_data, requires_grad=True)
+    bt_w = Tensor(w_data, requires_grad=True)
+    bt_out = bt_x @ bt_w
+    bt_loss = bt_out.sum()
+    bt_loss.backward()
+
+    # 3. Verify
+    np.testing.assert_allclose(bt_out.data, pt_out.detach().numpy(), atol=1e-5,
+                               err_msg="Batched MatMul Forward Mismatch")
+    np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=1e-5,
+                               err_msg="Batched MatMul X Gradient Mismatch")
+    np.testing.assert_allclose(bt_w.grad, pt_w.grad.numpy(), atol=1e-5,
+                               err_msg="Batched MatMul W Gradient Mismatch")
+
+def test_reshape_parity():
+    """Verify Tensor.reshape forward and backward against PyTorch."""
+    np.random.seed(42)
+    x_data = np.random.randn(2, 3, 4).astype(np.float32)
+
+    # 1. PyTorch
+    pt_x = torch.tensor(x_data, requires_grad=True)
+    pt_out = pt_x.reshape(6, 4)
+    pt_loss = pt_out.sum()
+    pt_loss.backward()
+
+    # 2. BareTensor
+    bt_x = Tensor(x_data, requires_grad=True)
+    bt_out = bt_x.reshape((6, 4))
+    bt_loss = bt_out.sum()
+    bt_loss.backward()
+
+    # 3. Verify
+    np.testing.assert_allclose(bt_out.data, pt_out.detach().numpy(), atol=1e-5,
+                               err_msg="Reshape Forward Mismatch")
+    np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=1e-5,
+                               err_msg="Reshape Gradient Mismatch")
+
+def test_layer_norm_3d_autograd():
+    """Verify 3D batched LayerNorm forward and backward against PyTorch."""
+    np.random.seed(42)
+    B, T, C = 2, 3, 4
+    x_data = np.random.randn(B, T, C).astype(np.float32)
+    gamma_data = np.random.randn(C).astype(np.float32)
+    beta_data = np.random.randn(C).astype(np.float32)
+
+    # PyTorch
+    pt_x = torch.tensor(x_data, requires_grad=True)
+    pt_gamma = torch.tensor(gamma_data, requires_grad=True)
+    pt_beta = torch.tensor(beta_data, requires_grad=True)
+    pt_out = torch.nn.functional.layer_norm(pt_x, (C,), pt_gamma, pt_beta, eps=1e-5)
+    pt_loss = pt_out.sum()
+    pt_loss.backward()
+
+    # BareTensor
+    bt_x = Tensor(x_data, requires_grad=True)
+    bt_gamma = Tensor(gamma_data, requires_grad=True)
+    bt_beta = Tensor(beta_data, requires_grad=True)
+    bt_out = layer_norm(bt_x, bt_gamma, bt_beta, eps=1e-5)
+    bt_loss = bt_out.sum()
+    bt_loss.backward()
+
+    # Verify
+    np.testing.assert_allclose(bt_out.data, pt_out.detach().numpy(), atol=1e-5,
+                               err_msg="3D LayerNorm Forward Mismatch")
+    np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=1e-4,
+                               err_msg="3D LayerNorm X Gradient Mismatch")
+    np.testing.assert_allclose(bt_gamma.grad, pt_gamma.grad.numpy(), atol=1e-4,
+                               err_msg="3D LayerNorm Gamma Gradient Mismatch")
+    np.testing.assert_allclose(bt_beta.grad, pt_beta.grad.numpy(), atol=1e-4,
+                               err_msg="3D LayerNorm Beta Gradient Mismatch")
+
+
+
+
+

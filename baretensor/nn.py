@@ -91,7 +91,8 @@ def scaled_dot_product_attention(Q, K, V, mask=None):
     mask: Optional Tensor of shape (Sequence_Length x Sequence_Length)
     """
     d_k = Q.data.shape[-1]
-    scores = Q @ K.transpose()
+    k_t_axes = tuple(range(K.data.ndim - 2)) + (K.data.ndim - 1, K.data.ndim - 2)
+    scores = Q @ K.transpose(k_t_axes)
     scaled_scores = scores * (1.0 / np.sqrt(d_k))
     if mask is not None:
         scaled_scores = scaled_scores + mask
@@ -116,9 +117,11 @@ def layer_norm(x, gamma, beta, eps=1e-5):
     def _backward():
         dy = out.grad
         if gamma.requires_grad:
-            gamma.grad += np.sum(dy * x_hat, axis=0)
+            sum_axes = tuple(range(dy.ndim - 1))
+            gamma.grad += np.sum(dy * x_hat, axis=sum_axes)
         if beta.requires_grad:
-            beta.grad += np.sum(dy, axis=0)
+            sum_axes = tuple(range(dy.ndim - 1))
+            beta.grad += np.sum(dy, axis=sum_axes)
         if x.requires_grad:
             dx_hat = dy * gamma.data
             mean_dx_hat = np.mean(dx_hat, axis=-1, keepdims=True)
@@ -199,8 +202,8 @@ class TransformerEncoderBlock(Module):
         self.gamma2 = Tensor(np.ones(d_model), requires_grad=True)
         self.beta2 = Tensor(np.zeros(d_model), requires_grad=True)
 
-    def forward(self, x):
-        attn_out = self.mha.forward(x)
+    def forward(self, x, mask=None):
+        attn_out = self.mha.forward(x, mask=mask)
         x = layer_norm(x + attn_out, self.gamma1, self.beta1)
         ffn_out = ((x @ self.W_f1) + self.b_f1).relu() @ self.W_f2 + self.b_f2
         out = layer_norm(x + ffn_out, self.gamma2, self.beta2)
@@ -211,3 +214,15 @@ class TransformerEncoderBlock(Module):
         params += [self.gamma1, self.beta1, self.gamma2, self.beta2]
         params += [self.W_f1, self.b_f1, self.W_f2, self.b_f2]
         return params
+
+class Embedding(Module):
+    """Embedding layer for mapping token IDs to dense vectors."""
+    def __init__(self, vocab_size, embedding_dim):
+        self.weight = Tensor(np.random.randn(vocab_size, embedding_dim) * 0.02, requires_grad=True)
+
+    def __call__(self, indices):
+        return self.weight.embedding(indices)
+
+    def parameters(self):
+        return [self.weight]
+

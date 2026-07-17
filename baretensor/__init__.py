@@ -8,6 +8,7 @@ from .nn import (
     layer_norm,
     cross_entropy_loss,
     cat,
+    Embedding,
 )
 from .optim import SGD
 
@@ -21,5 +22,6 @@ __all__ = [
     "layer_norm",
     "cross_entropy_loss",
     "cat",
+    "Embedding",
     "SGD",
 ]
