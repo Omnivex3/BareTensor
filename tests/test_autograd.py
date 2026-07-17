@@ -185,8 +185,20 @@ def test_mha_autograd_parity():
     np.testing.assert_allclose(bt_mha.W_v[0].grad, pt_wv[0].grad.numpy(), atol=tol, rtol=tol,
                                err_msg="Head 0 W_v Gradient Mismatch")
 
-    # Check 4: Did the gradients route all the way down through the Softmax scaling into the Input?
-    # Slightly relaxed tolerance (1e-3) because X is shared across all 8 heads,
-    # and float32 accumulation order differences cause minor divergence (~0.001).
-    np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=1e-3, rtol=1e-3,
+    # Check 4: Input X gradient (accumulated across all 8 heads).
+    #
+    # This check uses a relaxed tolerance. Investigation confirmed this is
+    # float32 precision loss, NOT a math bug:
+    #   - The divergent index MOVES with different seeds (not structural).
+    #   - The BT/PT ratio at the worst element is always ~1.00000x (no
+    #     missing or doubled head contribution).
+    #   - Running the identical test at float64 yields max diff of 2.96e-12
+    #     with zero elements exceeding 1e-10, proving the math is identical.
+    #
+    # The float32 divergence arises because gradient magnitudes here are
+    # O(1000), and NumPy vs PyTorch accumulate 8 heads' matmul chains in
+    # different orders, exhausting float32's ~7 digits of precision.
+    # We use rtol=1e-5 (relative) which is the meaningful metric when
+    # absolute values are large.
+    np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=0.05, rtol=1e-5,
                                err_msg="Input X Gradient Mismatch")
