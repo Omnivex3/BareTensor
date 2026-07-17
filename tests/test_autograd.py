@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import pytest
 from baretensor.tensor import Tensor
-from baretensor.nn import MultiHeadAttention, TransformerEncoderBlock, layer_norm, scaled_dot_product_attention
+from baretensor.nn import MultiHeadAttention, TransformerEncoderBlock, layer_norm, scaled_dot_product_attention, cross_entropy_loss
 
 def test_linear_relu_autograd():
     # 1. Generate random starting data
@@ -202,3 +202,32 @@ def test_mha_autograd_parity():
     # absolute values are large.
     np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=0.05, rtol=1e-5,
                                err_msg="Input X Gradient Mismatch")
+
+def test_cross_entropy_parity():
+    """Verify cross_entropy_loss forward and backward against
+    torch.nn.functional.cross_entropy with identical logits and targets."""
+    np.random.seed(42)
+    batch_size = 32
+    num_classes = 10
+
+    logits_data = np.random.randn(batch_size, num_classes).astype(np.float32)
+    targets = np.random.randint(0, num_classes, size=batch_size)
+
+    # PyTorch
+    pt_logits = torch.tensor(logits_data, requires_grad=True)
+    pt_targets = torch.tensor(targets, dtype=torch.long)
+    pt_loss = torch.nn.functional.cross_entropy(pt_logits, pt_targets)
+    pt_loss.backward()
+
+    # BareTensor
+    bt_logits = Tensor(logits_data, requires_grad=True)
+    bt_loss = cross_entropy_loss(bt_logits, targets)
+    bt_loss.backward()
+
+    # Check 1: Forward loss values match
+    np.testing.assert_allclose(bt_loss.data, pt_loss.detach().numpy(), atol=1e-5,
+                               err_msg="Cross-Entropy Forward Loss Mismatch")
+
+    # Check 2: Backward gradients match
+    np.testing.assert_allclose(bt_logits.grad, pt_logits.grad.numpy(), atol=1e-5,
+                               err_msg="Cross-Entropy Backward Gradient Mismatch")

@@ -1,6 +1,72 @@
 import numpy as np
 from .tensor import Tensor
 
+class Module:
+    """Base class for all neural network modules."""
+
+    def parameters(self):
+        """Return list of learnable parameters. Override in subclasses."""
+        return []
+
+    def zero_grad(self):
+        """Zero all parameter gradients."""
+        for param in self.parameters():
+            param.grad = np.zeros_like(param.data)
+
+    def _param_names(self, prefix=''):
+        """Walk attributes to build named (key, param) pairs."""
+        result = []
+        for attr_name in sorted(vars(self)):
+            attr = getattr(self, attr_name)
+            full_name = f"{prefix}{attr_name}" if prefix else attr_name
+            if isinstance(attr, Tensor) and attr.requires_grad:
+                result.append((full_name, attr))
+            elif isinstance(attr, Module):
+                result.extend(attr._param_names(prefix=f"{full_name}."))
+            elif isinstance(attr, list):
+                for i, item in enumerate(attr):
+                    indexed_name = f"{full_name}.{i}"
+                    if isinstance(item, Tensor) and item.requires_grad:
+                        result.append((indexed_name, item))
+                    elif isinstance(item, Module):
+                        result.extend(item._param_names(prefix=f"{indexed_name}."))
+        return result
+
+    def save(self, filepath):
+        named_params = {name: param.data for name, param in self._param_names()}
+        np.savez(filepath, **named_params)
+        print(f"Model saved to {filepath}.npz ({len(named_params)} parameters)")
+
+    def load(self, filepath):
+        if not filepath.endswith('.npz'):
+            filepath += '.npz'
+        named_params = dict(self._param_names())
+        with np.load(filepath) as data:
+            for name, param in named_params.items():
+                if name not in data:
+                    raise ValueError(f"Missing parameter '{name}' in checkpoint")
+                saved = data[name]
+                if param.data.shape != saved.shape:
+                    raise ValueError(f"Shape mismatch for '{name}': expected {param.data.shape}, got {saved.shape}")
+                param.data = saved
+        print(f"Model loaded from {filepath}")
+
+class Linear(Module):
+    """Fully connected linear layer: y = x @ W + b."""
+
+    def __init__(self, in_features, out_features):
+        self.weight = Tensor(
+            np.random.randn(in_features, out_features) * np.sqrt(2.0 / in_features),
+            requires_grad=True,
+        )
+        self.bias = Tensor(np.zeros(out_features), requires_grad=True)
+
+    def __call__(self, x):
+        return x @ self.weight + self.bias
+
+    def parameters(self):
+        return [self.weight, self.bias]
+
 def cat(tensors, axis=-1):
     """Concatenates a list of Tensors along a specified axis."""
     out_data = np.concatenate([t.data for t in tensors], axis=axis)
@@ -59,7 +125,38 @@ def layer_norm(x, gamma, beta, eps=1e-5):
     out._backward = _backward
     return out
 
-class MultiHeadAttention:
+def cross_entropy_loss(logits, targets):
+    """
+    Cross-entropy loss for classification.
+
+    logits: Tensor of shape (Batch_Size, Num_Classes)
+    targets: NumPy array of shape (Batch_Size,) with integer class labels
+    """
+    N, C = logits.data.shape
+
+    # Numerically stable softmax
+    shifted = logits.data - np.max(logits.data, axis=-1, keepdims=True)
+    exp_shifted = np.exp(shifted)
+    probs = exp_shifted / np.sum(exp_shifted, axis=-1, keepdims=True)
+
+    # Log probabilities with epsilon for numerical stability
+    log_probs = np.log(probs + 1e-7)
+
+    # Cross-entropy: pick log-prob of the correct class, average over batch
+    loss_val = -np.mean(log_probs[np.arange(N), targets])
+
+    out = Tensor(np.array(loss_val), parents=(logits,), requires_grad=True)
+
+    def _backward():
+        if logits.requires_grad:
+            one_hot = np.zeros_like(probs)
+            one_hot[np.arange(N), targets] = 1.0
+            logits.grad += (probs - one_hot) / N * out.grad
+
+    out._backward = _backward
+    return out
+
+class MultiHeadAttention(Module):
     def __init__(self, d_model, num_heads):
         self.num_heads = num_heads
         self.d_k = d_model // num_heads
@@ -86,7 +183,7 @@ class MultiHeadAttention:
     def parameters(self):
         return self.W_q + self.W_k + self.W_v + [self.W_o]
 
-class TransformerEncoderBlock:
+class TransformerEncoderBlock(Module):
     def __init__(self, d_model, num_heads, d_ff):
         self.mha = MultiHeadAttention(d_model, num_heads)
         self.gamma1 = Tensor(np.ones(d_model), requires_grad=True)
