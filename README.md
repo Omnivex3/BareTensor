@@ -1,10 +1,10 @@
-# BareTensor 🧠
+# BareTensor
 
 > **A purely educational, NumPy-only autograd engine and deep learning framework built from scratch to demystify how PyTorch actually works.**
 
 ---
 
-## 📌 Why Does This Exist?
+##  Why Does This Exist?
 
 Modern frameworks like PyTorch and TensorFlow are incredible, but they operate as massive black boxes. When your model suffers from vanishing gradients, shape broadcasting mismatches, or computational graph errors, debugging becomes a nightmare if you don't understand the underlying mathematics of vector-Jacobian products (VJPs) and topological sorting.
 
@@ -16,7 +16,7 @@ If you can build a neural network here, you can debug anything PyTorch throws at
 
 ---
 
-## 🚀 Core Features
+##  Core Features
 
 - **Dynamic Computational Graph:** Automatically tracks operations and parent dependencies on the fly.
 - **Reverse-Mode Autograd Engine:** Implements a custom Depth-First Search (DFS) topological sort to route gradients backward through complex, branching networks.
@@ -27,7 +27,7 @@ If you can build a neural network here, you can debug anything PyTorch throws at
 
 ---
 
-## 💻 Quickstart: Training a Neural Network
+##  Quickstart: Training a Neural Network
 
 Here is how you train a 2-layer Multi-Layer Perceptron (MLP) to solve the classic non-linear XOR problem using only raw tensor math and BareTensor's autograd engine:
 
@@ -81,7 +81,7 @@ for epoch in range(1000):
 
 ---
 
-## 🔬 Under the Hood: How the Autograd Works
+##  Under the Hood: How the Autograd Works
 
 BareTensor does not rely on numerical approximation. It computes exact analytical gradients. Every time you perform an operation on a `Tensor`, it returns a new `Tensor` that contains a pointer to the exact mathematical function (`_backward`) required to compute its local derivative (vector-Jacobian product).
 
@@ -105,7 +105,7 @@ def backward(self):
 
 ---
 
-## 🧪 Running the Verification Tests
+##  Running the Verification Tests
 
 A professional framework requires mathematical proof. BareTensor comes with a `pytest` suite that generates identical random weights, executes complex forward/backward passes in both PyTorch and BareTensor, and asserts that the resulting gradients match down to the 5th decimal place:
 
