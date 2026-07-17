@@ -1,22 +1,26 @@
-# BareTensor 🚀
+# BareTensor
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 [![NumPy](https://img.shields.io/badge/NumPy-✓-013243)](https://numpy.org/)
 [![PyTorch Parity](https://img.shields.io/badge/PyTorch_Parity-≤_1e⁻⁴-green)](https://github.com/Omnivex3/BareTensor)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/baretensor)](https://pypi.org/project/baretensor/)
 
-![BareTensor](assets/BareTensor.png)
-
-Autograd engine and transformer framework in pure Python/NumPy — verified against PyTorch's C++ backend to ≤ 1e⁻⁴.
+Autograd engine and transformer framework in pure Python/NumPy — verified against PyTorch's C++ backend to ≤ 1e⁻⁴.
 
 ---
 
-## Quickstart
+## Installation
 
 ```bash
-pip install -e .
-pytest tests/
+pip install baretensor
 ```
+
+Requires Python 3.10+ and NumPy ≥ 1.26.
+
+---
+
+## Quick Start
 
 ```python
 from baretensor import Tensor
@@ -29,6 +33,8 @@ y.backward()
 
 print(w.grad)  # exact analytical gradient, not an approximation
 ```
+
+See the [examples/](https://github.com/Omnivex3/BareTensor/tree/main/examples) directory on GitHub for full working demos (XOR, MNIST, Transformer, MicroGPT, Adam vs SGD).
 
 ---
 
@@ -69,3 +75,11 @@ class MicroGPT(Module):
         x = self.transformer(x, mask=mask)
         return self.lm_head(x)
 ```
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+Full documentation at [github.com/Omnivex3/BareTensor](https://github.com/Omnivex3/BareTensor).

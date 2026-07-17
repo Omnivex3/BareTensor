@@ -11,6 +11,7 @@ from .nn import (
     Embedding,
 )
 from .optim import SGD, Adam
+from .data import Dataset, TensorDataset, DataLoader
 
 __all__ = [
     "Tensor",
@@ -25,4 +26,7 @@ __all__ = [
     "Embedding",
     "SGD",
     "Adam",
+    "Dataset",
+    "TensorDataset",
+    "DataLoader",
 ]

@@ -1,15 +1,26 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "baretensor"
-version = "0.1.0"
-description = "A purely educational, NumPy-only autograd engine and deep learning framework built from scratch"
+version = "0.2.0"
+description = "A pure-NumPy deep learning framework with reverse-mode automatic differentiation"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Omnivex3", email = ""},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
-    "numpy",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]
@@ -18,6 +29,9 @@ dev = [
     "torch",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["baretensor*"]
+[project.urls]
+Homepage = "https://github.com/Omnivex3/BareTensor"
+Repository = "https://github.com/Omnivex3/BareTensor"
+
+[tool.hatch.build.targets.wheel]
+packages = ["baretensor"]
