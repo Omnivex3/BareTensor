@@ -1,40 +1,55 @@
-def generate_readme_md():
-    readme_content = """# BareTensor 🚀
+# BareTensor 🚀
 
 ![BareTensor](assets/BareTensor.png)
 
-A pure-NumPy deep learning framework and reverse-mode automatic differentiation engine, built from absolute mathematical scratch. 
-
-BareTensor was designed to demystify deep learning by stripping away CUDA, C++ backends, and abstractions, leaving only pure Python and tensor calculus. It supports dynamic computational graphs, multi-head attention, and has been rigorously verified against PyTorch's C++ autograd implementation.
+Autograd engine and transformer framework in pure Python/NumPy — verified against PyTorch's C++ backend to ≤ 1e⁻⁴.
 
 ---
 
-## 🛠 Core Features
+## Quickstart
 
-*   **Custom Autograd Engine:** Dynamic DAG construction with topological sorting and reverse-mode differentiation.
-*   **Mathematical Parity:** Rigorously tested against PyTorch, achieving near-identical gradient parity for complex ops including LayerNorm, Multi-Head Attention, and Softmax Cross-Entropy.
-*   **Modern Architecture:** Implements `Module` and `Linear` abstractions with recursive parameter tracking and named `state_dict` serialization.
-*   **Autoregressive Transformer:** Includes a fully functional `Micro-GPT` implementation with causal masking, positional encodings, and scatter-add embedding gradients.
+```bash
+pip install -e .
+pytest tests/
+```
+
+```python
+from baretensor import Tensor
+
+# Forward pass traces the graph automatically
+x = Tensor([[1.0, 2.0]], requires_grad=True)
+w = Tensor([[0.5], [-0.3]], requires_grad=True)
+y = x @ w
+y.backward()
+
+print(w.grad)  # exact analytical gradient, not an approximation
+```
 
 ---
 
-## 🧪 Rigorous Verification
+## What's Here
 
-We believe "it works" is not enough. The framework includes a comprehensive `pytest` suite that ensures our analytical Jacobians match PyTorch's C++ engine down to the 5th decimal place.
+- **Autograd engine** — dynamic DAG, topological sort, reverse-mode differentiation
+- **Analytical Jacobians** — Softmax Cross-Entropy, LayerNorm, Batched MatMul. No numerical approximation
+- **Gradient un-broadcasting** — correctly collapses broadcasted dimensions across batch axes
+- **Micro-GPT** — autoregressive Transformer Decoder with causal masking, positional embeddings, scatter-add gradient routing
+- **Module system** — `Module`/`Linear`/`Embedding` with recursive param tracking and `state_dict` serialization
 
-| Feature | PyTorch Parity Status | Verification Method |
+---
+
+## Verified Against PyTorch
+
+| Feature | Status | Test |
 | :--- | :---: | :--- |
-| **Autograd Engine** | ✅ | `test_linear_relu_autograd` |
-| **Layer Normalization** | ✅ | `test_layer_norm_3d_autograd` |
-| **Multi-Head Attention**| ✅ | `test_mha_autograd_parity` |
-| **Softmax Cross-Entropy**| ✅ | `test_cross_entropy_parity` |
-| **Causal Masking** | ✅ | `test_causal_mask_parity` |
+| Linear + ReLU autograd | ✅ | `test_linear_relu_autograd` |
+| Layer Normalization (3D) | ✅ | `test_layer_norm_3d_autograd` |
+| Multi-Head Attention | ✅ | `test_mha_autograd_parity` |
+| Softmax Cross-Entropy | ✅ | `test_cross_entropy_parity` |
+| Causal Masking | ✅ | `test_causal_mask_parity` |
 
 ---
 
-## 🏗 Modular Design
-
-Building networks in BareTensor feels like building in PyTorch. Our modular design allows for clean, readable architecture definitions:
+## Architecture
 
 ```python
 class MicroGPT(Module):
@@ -42,11 +57,9 @@ class MicroGPT(Module):
         self.token_emb = Embedding(vocab_size, d_model)
         self.transformer = TransformerEncoderBlock(d_model, num_heads)
         self.lm_head = Linear(d_model, vocab_size)
-        
+
     def __call__(self, idx, mask=None):
         x = self.token_emb(idx)
         x = self.transformer(x, mask=mask)
         return self.lm_head(x)
 ```
-"""
-    return readme_content
