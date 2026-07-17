@@ -284,9 +284,9 @@ def test_causal_mask_parity():
 
     bt_x = Tensor(x_data, requires_grad=True)
 
-    # BareTensor causal mask: upper triangle is -1e9, rest is 0
+    # BareTensor causal mask: upper triangle is -inf, rest is 0
     mask_data = np.zeros((seq_length, seq_length), dtype=np.float32)
-    mask_data[np.triu_indices(seq_length, k=1)] = -1e9
+    mask_data[np.triu_indices(seq_length, k=1)] = -np.inf
     bt_mask = Tensor(mask_data, requires_grad=False)
 
     bt_out = bt_mha.forward(bt_x, mask=bt_mask)
