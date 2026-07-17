@@ -1,6 +1,8 @@
 def generate_readme_md():
     readme_content = """# BareTensor 🚀
 
+![BareTensor](assets/BareTensor.png)
+
 A pure-NumPy deep learning framework and reverse-mode automatic differentiation engine, built from absolute mathematical scratch. 
 
 BareTensor was designed to demystify deep learning by stripping away CUDA, C++ backends, and abstractions, leaving only pure Python and tensor calculus. It supports dynamic computational graphs, multi-head attention, and has been rigorously verified against PyTorch's C++ autograd implementation.
@@ -45,3 +47,6 @@ class MicroGPT(Module):
         x = self.token_emb(idx)
         x = self.transformer(x, mask=mask)
         return self.lm_head(x)
+```
+"""
+    return readme_content
