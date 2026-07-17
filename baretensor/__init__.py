@@ -10,7 +10,7 @@ from .nn import (
     cat,
     Embedding,
 )
-from .optim import SGD
+from .optim import SGD, Adam
 
 __all__ = [
     "Tensor",
@@ -24,4 +24,5 @@ __all__ = [
     "cat",
     "Embedding",
     "SGD",
+    "Adam",
 ]

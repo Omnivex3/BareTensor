@@ -17,3 +17,7 @@ dev = [
     "pytest",
     "torch",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["baretensor*"]

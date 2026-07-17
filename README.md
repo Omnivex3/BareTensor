@@ -39,6 +39,7 @@ print(w.grad)  # exact analytical gradient, not an approximation
 - **Gradient un-broadcasting** — correctly collapses broadcasted dimensions across batch axes
 - **Micro-GPT** — autoregressive Transformer Decoder with causal masking, positional embeddings, scatter-add gradient routing
 - **Module system** — `Module`/`Linear`/`Embedding` with recursive param tracking and `state_dict` serialization
+- **Optimizers** — `SGD` (vanilla) and `Adam` (adaptive, bias-corrected, optional weight decay)
 
 ---
 
