@@ -231,3 +231,80 @@ def test_cross_entropy_parity():
     # Check 2: Backward gradients match
     np.testing.assert_allclose(bt_logits.grad, pt_logits.grad.numpy(), atol=1e-5,
                                err_msg="Cross-Entropy Backward Gradient Mismatch")
+
+def test_causal_mask_parity():
+    """Verify MultiHeadAttention with a causal mask against PyTorch.
+    This ensures our mask addition does not leak future information or mess up gradients."""
+    np.random.seed(42)
+    seq_length = 5
+    d_model = 16
+    num_heads = 2
+    d_k = d_model // num_heads
+
+    x_data = np.random.randn(seq_length, d_model).astype(np.float32)
+    wq_data = [np.random.randn(d_model, d_k).astype(np.float32) for _ in range(num_heads)]
+    wk_data = [np.random.randn(d_model, d_k).astype(np.float32) for _ in range(num_heads)]
+    wv_data = [np.random.randn(d_model, d_k).astype(np.float32) for _ in range(num_heads)]
+    wo_data = np.random.randn(num_heads * d_k, d_model).astype(np.float32)
+
+    # 1. PyTorch Forward & Backward Pass
+    pt_x = torch.tensor(x_data, requires_grad=True)
+    pt_wq = [torch.tensor(w, requires_grad=True) for w in wq_data]
+    pt_wk = [torch.tensor(w, requires_grad=True) for w in wk_data]
+    pt_wv = [torch.tensor(w, requires_grad=True) for w in wv_data]
+    pt_wo = torch.tensor(wo_data, requires_grad=True)
+
+    pt_heads = []
+    # PyTorch causal mask: upper triangle is -inf, rest is 0
+    mask_pt = torch.triu(torch.ones(seq_length, seq_length), diagonal=1) == 1
+
+    for i in range(num_heads):
+        q = pt_x @ pt_wq[i]
+        k = pt_x @ pt_wk[i]
+        v = pt_x @ pt_wv[i]
+
+        scores = (q @ k.transpose(-2, -1)) / np.sqrt(d_k)
+        scores = scores.masked_fill(mask_pt, float('-inf'))
+        attn_weights = torch.softmax(scores, dim=-1)
+        head_out = attn_weights @ v
+        pt_heads.append(head_out)
+
+    pt_multi_head_out = torch.cat(pt_heads, dim=-1)
+    pt_out = pt_multi_head_out @ pt_wo
+    pt_loss = pt_out.sum()
+    pt_loss.backward()
+
+    # 2. BareTensor Forward & Backward Pass
+    bt_mha = MultiHeadAttention(d_model=d_model, num_heads=num_heads)
+    for i in range(num_heads):
+        bt_mha.W_q[i] = Tensor(wq_data[i], requires_grad=True)
+        bt_mha.W_k[i] = Tensor(wk_data[i], requires_grad=True)
+        bt_mha.W_v[i] = Tensor(wv_data[i], requires_grad=True)
+    bt_mha.W_o = Tensor(wo_data, requires_grad=True)
+
+    bt_x = Tensor(x_data, requires_grad=True)
+
+    # BareTensor causal mask: upper triangle is -1e9, rest is 0
+    mask_data = np.zeros((seq_length, seq_length), dtype=np.float32)
+    mask_data[np.triu_indices(seq_length, k=1)] = -1e9
+    bt_mask = Tensor(mask_data, requires_grad=False)
+
+    bt_out = bt_mha.forward(bt_x, mask=bt_mask)
+    bt_loss = bt_out.sum()
+    bt_loss.backward()
+
+    # 3. Interrogation
+    tol = 1e-4
+    np.testing.assert_allclose(bt_out.data, pt_out.detach().numpy(), atol=tol, rtol=tol,
+                               err_msg="Masked Forward Pass Mismatch")
+    np.testing.assert_allclose(bt_mha.W_o.grad, pt_wo.grad.numpy(), atol=tol, rtol=tol,
+                               err_msg="Masked W_o Gradient Mismatch")
+    np.testing.assert_allclose(bt_mha.W_q[0].grad, pt_wq[0].grad.numpy(), atol=tol, rtol=tol,
+                               err_msg="Masked Head 0 W_q Gradient Mismatch")
+    np.testing.assert_allclose(bt_mha.W_k[0].grad, pt_wk[0].grad.numpy(), atol=tol, rtol=tol,
+                               err_msg="Masked Head 0 W_k Gradient Mismatch")
+    np.testing.assert_allclose(bt_mha.W_v[0].grad, pt_wv[0].grad.numpy(), atol=tol, rtol=tol,
+                               err_msg="Masked Head 0 W_v Gradient Mismatch")
+    np.testing.assert_allclose(bt_x.grad, pt_x.grad.numpy(), atol=1e-3, rtol=1e-3,
+                               err_msg="Masked Input X Gradient Mismatch")
+

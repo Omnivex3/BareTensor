@@ -83,18 +83,22 @@ def cat(tensors, axis=-1):
     out._backward = _backward
     return out
 
-def scaled_dot_product_attention(Q, K, V):
+def scaled_dot_product_attention(Q, K, V, mask=None):
     """
     Q: Query tensor (Sequence_Length x Hidden_Dim)
     K: Key tensor (Sequence_Length x Hidden_Dim)
     V: Value tensor (Sequence_Length x Hidden_Dim)
+    mask: Optional Tensor of shape (Sequence_Length x Sequence_Length)
     """
     d_k = Q.data.shape[-1]
     scores = Q @ K.transpose()
     scaled_scores = scores * (1.0 / np.sqrt(d_k))
+    if mask is not None:
+        scaled_scores = scaled_scores + mask
     weights = scaled_scores.softmax(axis=-1)
     context = weights @ V
     return context, weights
+
 
 def layer_norm(x, gamma, beta, eps=1e-5):
     """
@@ -168,13 +172,13 @@ class MultiHeadAttention(Module):
         self.W_v = [Tensor(np.random.randn(d_model, self.d_k) * 0.1, requires_grad=True) for _ in range(num_heads)]
         self.W_o = Tensor(np.random.randn(num_heads * self.d_k, d_model) * 0.1, requires_grad=True)
 
-    def forward(self, X):
+    def forward(self, X, mask=None):
         heads = []
         for i in range(self.num_heads):
             Q_i = X @ self.W_q[i]
             K_i = X @ self.W_k[i]
             V_i = X @ self.W_v[i]
-            head_out, _ = scaled_dot_product_attention(Q_i, K_i, V_i)
+            head_out, _ = scaled_dot_product_attention(Q_i, K_i, V_i, mask=mask)
             heads.append(head_out)
         multi_head_out = cat(heads, axis=-1)
         output = multi_head_out @ self.W_o
