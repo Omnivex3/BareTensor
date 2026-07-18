@@ -1,8 +1,16 @@
 import numpy as np
 
 class Tensor:
-    def __init__(self, data, requires_grad=False, parents=()):
-        self.data = np.array(data, dtype=np.float32)
+    def __init__(self, data, requires_grad=False, parents=(), dtype=None):
+        if dtype is not None:
+            self.data = np.array(data, dtype=dtype)
+        else:
+            self.data = np.array(data)
+        # If requires_grad is True, ensure float type for gradient computation
+        if requires_grad and self.data.dtype.kind != 'f':
+            self.data = self.data.astype(np.float32)
+        elif requires_grad and self.data.dtype != np.float32:
+            self.data = self.data.astype(np.float32)
         self.requires_grad = requires_grad
         self.parents = parents
         self.grad = np.zeros_like(self.data) if requires_grad else None

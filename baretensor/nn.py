@@ -2,23 +2,34 @@ import numpy as np
 from .tensor import Tensor
 
 class Module:
-    """Base class for all neural network modules."""
+    """Base class for all neural network modules.
+
+    Child modules assigned via self.xxx = Module() are automatically
+    tracked for parameter collection.
+    """
+
     def __init__(self):
+        self._modules = {}
         self.training = True
+
+    def __setattr__(self, name, value):
+        if isinstance(value, Module):
+            self._modules[name] = value
+        super().__setattr__(name, value)
 
     def train(self, mode=True):
         self.training = mode
-        for value in vars(self).values():
-            if isinstance(value, Module):
-                value.train(mode)
+        for child in self._modules.values():
+            child.train(mode)
 
     def eval(self):
         self.train(False)
 
-
     def parameters(self):
-        """Return list of learnable parameters. Override in subclasses."""
-        return []
+        params = []
+        for child in self._modules.values():
+            params.extend(child.parameters())
+        return params
 
     def zero_grad(self):
         """Zero all parameter gradients."""
