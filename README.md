@@ -1,5 +1,7 @@
 # BareTensor
 
+<p align="center"><img src="assets/BareTensor.png" alt="BareTensor" width="358"></p>
+
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 [![NumPy](https://img.shields.io/badge/NumPy-✓-013243)](https://numpy.org/)
 [![PyTorch Parity](https://img.shields.io/badge/PyTorch_Parity-≤_1e⁻⁴-green)](https://github.com/Omnivex3/BareTensor)
