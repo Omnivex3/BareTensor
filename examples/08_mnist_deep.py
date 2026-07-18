@@ -31,8 +31,6 @@ class DeepMNIST(Module):
         x = self.drop3(self.bn3(self.fc3(x).relu()))
         return self.fc4(x)
 
-    def __call__(self, x):
-        return self.forward(x)
 
     def parameters(self):
         """Recursively collect all trainable parameters."""

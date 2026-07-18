@@ -36,6 +36,7 @@ def get_batch(data, seq_len, batch_size):
 # ==========================================
 class MicroGPT(Module):
     def __init__(self, vocab_size, d_model, num_heads, d_ff, max_seq_len):
+        super().__init__()
         self.max_seq_len = max_seq_len
         # Token and Positional Embeddings
         self.tok_emb = Embedding(vocab_size, d_model)

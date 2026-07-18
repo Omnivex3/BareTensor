@@ -26,8 +26,6 @@ class PolicyNetwork(Module):
         probs = logits.softmax(axis=-1)
         return probs
 
-    def __call__(self, x):
-        return self.forward(x)
 
 
 def compute_discounted_returns(rewards, gamma=0.99):

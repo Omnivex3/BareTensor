@@ -137,3 +137,47 @@ class DataLoader:
             start = num_full * bs
             batch_idx = indices[start:]
             yield tuple(t[batch_idx] for t in tensors)
+
+
+class Subset(Dataset):
+    """Subset of a dataset at specified indices.
+
+    Args:
+        dataset: Source Dataset to sample from.
+        indices: Sequence of integer indices into *dataset*.
+    """
+
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = np.asarray(indices)
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        return self.dataset[self.indices[idx]]
+
+
+def random_split(dataset, lengths, seed=42):
+    """Randomly split a dataset into non-overlapping subsets.
+
+    Args:
+        dataset: Dataset to split.
+        lengths: List of subset sizes as integers, or fractions summing to 1.0.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        List of :class:`Subset` instances.
+    """
+    n = len(dataset)
+    if all(isinstance(l, float) for l in lengths) and abs(sum(lengths) - 1.0) < 1e-8:
+        lengths = [max(1, int(l * n)) for l in lengths[:-1]]
+        lengths.append(n - sum(lengths))
+
+    assert sum(lengths) == n, f"Sum of lengths ({sum(lengths)}) != dataset size ({n})"
+
+    rng = np.random.RandomState(seed)
+    indices = rng.permutation(n)
+    offsets = [0] + list(np.cumsum(lengths[:-1]))
+    return [Subset(dataset, indices[offset:offset + length])
+            for offset, length in zip(offsets, lengths)]

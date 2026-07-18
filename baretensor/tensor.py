@@ -94,12 +94,78 @@ class Tensor:
         other = other if isinstance(other, Tensor) else Tensor(other)
         return other.__matmul__(self)
 
+    def __neg__(self):
+        out = Tensor(-self.data, parents=(self,), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                self.grad += -out.grad
+
+        out._backward = _backward
+        return out
+
+    def __truediv__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(self.data / other.data, parents=(self, other), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                self.grad += self._unbroadcast(out.grad / other.data, self.data.shape)
+            if other.requires_grad:
+                other.grad += self._unbroadcast(-out.grad * self.data / (other.data ** 2), other.data.shape)
+
+        out._backward = _backward
+        return out
+
+    def __rtruediv__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        return other.__truediv__(self)
+
     def relu(self):
         out = Tensor(np.maximum(0, self.data), parents=(self,), requires_grad=True)
 
         def _backward():
             if self.requires_grad:
                 self.grad += out.grad * (self.data > 0).astype(np.float32)
+
+        out._backward = _backward
+        return out
+
+    def sigmoid(self):
+        s = 1.0 / (1.0 + np.exp(-self.data))
+        out = Tensor(s, parents=(self,), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                self.grad += out.grad * s * (1.0 - s)
+
+        out._backward = _backward
+        return out
+
+    def tanh(self):
+        t = np.tanh(self.data)
+        out = Tensor(t, parents=(self,), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                self.grad += out.grad * (1.0 - t ** 2)
+
+        out._backward = _backward
+        return out
+
+    def gelu(self):
+        c = np.sqrt(2.0 / np.pi)
+        inner = c * (self.data + 0.044715 * self.data ** 3)
+        tanh_inner = np.tanh(inner)
+        out_data = 0.5 * self.data * (1.0 + tanh_inner)
+        out = Tensor(out_data, parents=(self,), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                sech2 = 1.0 - tanh_inner ** 2
+                d_inner = c * (1.0 + 3.0 * 0.044715 * self.data ** 2)
+                d_gelu = 0.5 * (1.0 + tanh_inner) + 0.5 * self.data * sech2 * d_inner
+                self.grad += out.grad * d_gelu
 
         out._backward = _backward
         return out
@@ -155,6 +221,30 @@ class Tensor:
         def _backward():
             if self.requires_grad:
                 self.grad += out.grad.reshape(self.data.shape)
+
+        out._backward = _backward
+        return out
+
+
+    def exp(self):
+        e = np.exp(self.data)
+        out = Tensor(e, parents=(self,), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                self.grad += out.grad * e
+
+        out._backward = _backward
+        return out
+
+    def log(self, eps=1e-7):
+        safe = np.maximum(self.data, eps)
+        out_data = np.log(safe)
+        out = Tensor(out_data, parents=(self,), requires_grad=True)
+
+        def _backward():
+            if self.requires_grad:
+                self.grad += out.grad / safe
 
         out._backward = _backward
         return out

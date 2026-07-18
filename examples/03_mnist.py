@@ -6,10 +6,11 @@ from baretensor.optim import SGD
 
 class MLP(Module):
     def __init__(self):
+        super().__init__()
         self.fc1 = Linear(784, 128)
         self.fc2 = Linear(128, 10)
 
-    def __call__(self, x):
+    def forward(self, x):
         hidden = self.fc1(x).relu()
         logits = self.fc2(hidden)
         return logits

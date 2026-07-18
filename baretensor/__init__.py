@@ -1,19 +1,28 @@
+__version__ = "0.3.1"
+
 from .tensor import Tensor
 from .nn import (
     Module,
     Linear,
     Dropout,
     BatchNorm1d,
+    Sequential,
+    LayerNorm,
+    Conv2d,
+    MaxPool2d,
+    RMSNorm,
+    rope,
     MultiHeadAttention,
     TransformerEncoderBlock,
     scaled_dot_product_attention,
     layer_norm,
     cross_entropy_loss,
+    mse_loss,
     cat,
     Embedding,
 )
-from .optim import SGD, Adam
-from .data import Dataset, TensorDataset, DataLoader
+from .optim import SGD, Adam, AdamW, clip_grad_norm_, StepLR, CosineAnnealingLR
+from .data import Dataset, TensorDataset, DataLoader, Subset, random_split
 
 __all__ = [
     "Tensor",
@@ -21,16 +30,29 @@ __all__ = [
     "Linear",
     "Dropout",
     "BatchNorm1d",
+    "Sequential",
+    "LayerNorm",
+    "Conv2d",
+    "MaxPool2d",
+    "RMSNorm",
+    "rope",
     "MultiHeadAttention",
     "TransformerEncoderBlock",
     "scaled_dot_product_attention",
     "layer_norm",
     "cross_entropy_loss",
+    "mse_loss",
     "cat",
     "Embedding",
     "SGD",
     "Adam",
+    "AdamW",
+    "clip_grad_norm_",
+    "StepLR",
+    "CosineAnnealingLR",
     "Dataset",
     "TensorDataset",
     "DataLoader",
+    "Subset",
+    "random_split",
 ]
